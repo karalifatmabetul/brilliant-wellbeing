@@ -16,7 +16,7 @@ jobs:
       - name: 🏗 Checkout repository
         uses: actions/checkout@v4
 
-      - name: 🏗 Setup Node.js
+      - name: 🏗 Setup Node.js 20
         uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -41,28 +41,19 @@ jobs:
       - name: 🔨 Expo Prebuild (generate native Android project)
         run: npx expo prebuild --platform android --clean
 
-      - name: 🔧 Disable Lint checks
+      - name: ⚙️ Configure Gradle Properties
         run: |
-          echo "android.defaults.buildfeatures.buildconfig=true" >> android/gradle.properties
-          # Disable lint to prevent build failures from lint errors
-          cat >> android/app/build.gradle << 'EOF'
-
-          android {
-              lintOptions {
-                  abortOnError false
-                  checkReleaseBuilds false
-                  disable 'all'
-              }
-          }
-          EOF
+          echo "org.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m" >> android/gradle.properties
+          echo "android.lint.abortOnError=false" >> android/gradle.properties
+          echo "android.lint.checkReleaseBuilds=false" >> android/gradle.properties
 
       - name: 🏗 Build Debug APK with Gradle
         working-directory: android
-        run: ./gradlew assembleDebug --no-daemon -x lint -x lintDebug -x lintVitalAnalyzeDebug -x lintVitalReportDebug
+        run: ./gradlew assembleDebug --no-daemon --stacktrace -x lint -x lintDebug
 
       - name: 📱 Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: brilliant-wellbeing-android
+          name: brilliant-wellbeing-apk
           path: android/app/build/outputs/apk/debug/*.apk
           retention-days: 30
