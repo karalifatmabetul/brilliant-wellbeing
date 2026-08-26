@@ -41,7 +41,7 @@ jobs:
       - name: 🔨 Expo Prebuild (generate native Android project)
         run: npx expo prebuild --platform android --clean
 
-      - name: ⚙️ Configure Gradle Properties
+      - name: ⚙️ Configure Gradle & Node Environment
         run: |
           echo "org.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m" >> android/gradle.properties
           echo "android.lint.abortOnError=false" >> android/gradle.properties
@@ -49,7 +49,10 @@ jobs:
 
       - name: 🏗 Build Debug APK with Gradle
         working-directory: android
-        run: ./gradlew assembleDebug --no-daemon --stacktrace -x lint -x lintDebug
+        env:
+          NODE_PATH: ${{ github.workspace }}/node_modules
+          EXPO_PUBLIC_REVENUECAT_API_KEY: ${{ secrets.REVENUECAT_API_KEY }}
+        run: ./gradlew assembleDebug --no-daemon --stacktrace --info -x lint -x lintDebug
 
       - name: 📱 Upload APK artifact
         uses: actions/upload-artifact@v4
