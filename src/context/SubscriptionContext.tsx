@@ -6,7 +6,7 @@ import {
   restorePurchases as restorePurchasesService,
   isPremiumUser,
   getOfferings,
-  ENTITLEMENT_ID,
+  MOCK_OFFERINGS,
 } from '../services/revenueCat';
 
 interface SubscriptionState {
@@ -19,6 +19,7 @@ interface SubscriptionContextType extends SubscriptionState {
   purchase: (pkg: any) => Promise<boolean>;
   restorePurchases: () => Promise<boolean>;
   refreshStatus: () => Promise<void>;
+  toggleDevPremium: () => void;
 }
 
 const SubscriptionContext = createContext<SubscriptionContextType>({
@@ -28,13 +29,14 @@ const SubscriptionContext = createContext<SubscriptionContextType>({
   purchase: async () => false,
   restorePurchases: async () => false,
   refreshStatus: async () => {},
+  toggleDevPremium: () => {},
 });
 
 export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<SubscriptionState>({
     isPremium: false,
     isLoading: true,
-    offerings: null,
+    offerings: MOCK_OFFERINGS.current,
   });
 
   const refreshStatus = useCallback(async () => {
@@ -56,25 +58,41 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    let isMounted = true;
     async function init() {
       try {
         await initializeRevenueCat();
-        const [customerInfo, currentOfferings] = await Promise.all([
+        const [customerInfo, currentOfferings] = await Promise.allSettled([
           getCustomerInfo(),
           getOfferings(),
         ]);
 
-        setState({
-          isPremium: customerInfo ? isPremiumUser(customerInfo) : false,
-          isLoading: false,
-          offerings: currentOfferings,
-        });
+        if (isMounted) {
+          const info = customerInfo.status === 'fulfilled' ? customerInfo.value : null;
+          const offs = currentOfferings.status === 'fulfilled' ? currentOfferings.value : MOCK_OFFERINGS.current;
+
+          setState({
+            isPremium: info ? isPremiumUser(info) : false,
+            isLoading: false,
+            offerings: offs || MOCK_OFFERINGS.current,
+          });
+        }
       } catch (e) {
-        console.error('Error initializing RevenueCat:', e);
-        setState(prev => ({ ...prev, isLoading: false }));
+        console.error('Safe initialization caught error in SubscriptionProvider:', e);
+        if (isMounted) {
+          setState(prev => ({
+            ...prev,
+            isLoading: false,
+            offerings: MOCK_OFFERINGS.current,
+          }));
+        }
       }
     }
     init();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const purchase = useCallback(async (pkg: any): Promise<boolean> => {
@@ -103,6 +121,10 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const toggleDevPremium = useCallback(() => {
+    setState(prev => ({ ...prev, isPremium: !prev.isPremium }));
+  }, []);
+
   return (
     <SubscriptionContext.Provider
       value={{
@@ -110,6 +132,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         purchase,
         restorePurchases: restorePurchasesHandler,
         refreshStatus,
+        toggleDevPremium,
       }}
     >
       {children}

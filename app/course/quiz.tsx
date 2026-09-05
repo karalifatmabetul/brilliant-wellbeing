@@ -1,21 +1,53 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, SafeAreaView, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, SafeAreaView, Dimensions, Animated } from 'react-native';
 import { useRouter } from 'expo-router';
-import { colors } from '@/src/theme';
+import * as Haptics from 'expo-haptics';
+import { Colors } from '@/src/theme/colors';
+import { useAppContext } from '@/src/context/AppContext';
 
 const { width } = Dimensions.get('window');
 
 export default function QuizScreen() {
   const router = useRouter();
+  const { addXp } = useAppContext();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isChecking, setIsChecking] = useState(false);
-  
-  const handleCheck = () => {
-    if (!selectedId) return;
+  const [focusWidth, setFocusWidth] = useState('50%');
+  const [score, setScore] = useState('000');
+
+  const handleSelect = async (id: string) => {
+    if (isChecking) return;
+    try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch (e) {
+      // ignore if haptics unavailable on simulator
+    }
+    setSelectedId(id);
+  };
+
+  const handleCheck = async () => {
+    if (!selectedId || isChecking) return;
     setIsChecking(true);
+
+    const isCorrect = selectedId === 'hw';
+
+    try {
+      if (isCorrect) {
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        setFocusWidth('85%');
+        setScore('060');
+        addXp(60);
+      } else {
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        setFocusWidth('20%');
+      }
+    } catch (e) {
+      // ignore
+    }
+
     setTimeout(() => {
       router.push('/course/lesson');
-    }, 1500);
+    }, 1200);
   };
 
   return (
@@ -26,10 +58,10 @@ export default function QuizScreen() {
           <Text style={styles.closeText}>✕</Text>
         </TouchableOpacity>
         <View style={styles.progressBarContainer}>
-          <View style={styles.progressBarFill} />
+          <View style={[styles.progressBarFill, isChecking && { width: '40%' }]} />
         </View>
         <View style={styles.scoreContainer}>
-          <Text style={styles.scoreText}>✨ ⚡ 000</Text>
+          <Text style={styles.scoreText}>✨ ⚡ {score}</Text>
         </View>
       </View>
 
@@ -42,10 +74,15 @@ export default function QuizScreen() {
       {/* Choices */}
       <View style={styles.choicesContainer}>
         {/* Left Choice */}
-        <TouchableOpacity 
-          style={[styles.choiceCard, selectedId === 'reels' && styles.selectedCard]} 
-          onPress={() => setSelectedId('reels')}
+        <TouchableOpacity
+          style={[
+            styles.choiceCard,
+            selectedId === 'reels' && styles.selectedCard,
+            isChecking && selectedId === 'reels' && styles.wrongCard,
+          ]}
+          onPress={() => handleSelect('reels')}
           disabled={isChecking}
+          activeOpacity={0.8}
         >
           <Image source={require('@/assets/images/reels-hole.jpg')} style={styles.choiceImage} />
           <View style={styles.radioContainer}>
@@ -56,14 +93,15 @@ export default function QuizScreen() {
         </TouchableOpacity>
 
         {/* Right Choice */}
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[
-            styles.choiceCard, 
-            selectedId === 'hw' && styles.selectedCard, 
-            isChecking && selectedId === 'hw' && styles.correctCard
-          ]} 
-          onPress={() => setSelectedId('hw')}
+            styles.choiceCard,
+            selectedId === 'hw' && styles.selectedCard,
+            isChecking && selectedId === 'hw' && styles.correctCard,
+          ]}
+          onPress={() => handleSelect('hw')}
           disabled={isChecking}
+          activeOpacity={0.8}
         >
           <Image source={require('@/assets/images/homework-deadline.jpg')} style={styles.choiceImage} />
           <View style={styles.radioContainer}>
@@ -78,20 +116,23 @@ export default function QuizScreen() {
       <View style={styles.focusContainer}>
         <Text style={styles.focusLabel}>Focus Capacity</Text>
         <View style={styles.focusBar}>
-          <View style={styles.focusGradient} />
-          <View style={styles.focusSlider}>
-             <Text>👁️</Text>
+          <View style={[styles.focusGradient, { width: focusWidth as any }]} />
+          <View style={[styles.focusSlider, { left: focusWidth as any }]}>
+            <Text style={{ fontSize: 14 }}>👁️</Text>
           </View>
         </View>
       </View>
 
       {/* Check Button */}
-      <TouchableOpacity 
+      <TouchableOpacity
         style={[styles.checkButton, !selectedId && styles.checkButtonDisabled]}
         onPress={handleCheck}
         disabled={!selectedId || isChecking}
+        activeOpacity={0.8}
       >
-        <Text style={[styles.checkButtonText, !selectedId && styles.checkButtonTextDisabled]}>Check</Text>
+        <Text style={[styles.checkButtonText, !selectedId && styles.checkButtonTextDisabled]}>
+          {isChecking ? 'Checking...' : 'Check'}
+        </Text>
       </TouchableOpacity>
     </SafeAreaView>
   );
@@ -100,7 +141,7 @@ export default function QuizScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0D0D0D', // colors.background
+    backgroundColor: Colors.background,
     paddingHorizontal: 16,
     paddingTop: 10,
   },
@@ -114,21 +155,21 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   closeText: {
-    color: '#A0A0A0', // colors.textSecondary
+    color: Colors.textSecondary,
     fontSize: 20,
     fontWeight: 'bold',
   },
   progressBarContainer: {
     flex: 1,
     height: 8,
-    backgroundColor: '#1A1A2E', // colors.surface
+    backgroundColor: Colors.surface,
     borderRadius: 4,
     marginHorizontal: 16,
   },
   progressBarFill: {
-    width: '10%',
+    width: '20%',
     height: '100%',
-    backgroundColor: '#00E676', // colors.accent
+    backgroundColor: Colors.accent,
     borderRadius: 4,
   },
   scoreContainer: {
@@ -136,7 +177,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   scoreText: {
-    color: '#FFD700', // colors.premiumGold
+    color: Colors.premiumGold,
     fontWeight: 'bold',
     fontSize: 16,
   },
@@ -144,23 +185,23 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   questionTitle: {
-    color: '#FFFFFF', // colors.textPrimary
+    color: Colors.textPrimary,
     fontSize: 22,
     fontWeight: 'bold',
     marginBottom: 8,
   },
   questionSubtitle: {
-    color: '#A0A0A0',
-    fontSize: 16,
+    color: Colors.textSecondary,
+    fontSize: 15,
   },
   choicesContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 40,
+    marginBottom: 32,
   },
   choiceCard: {
-    width: (width - 32 - 16) / 2, // 2 columns with 16 gap
-    backgroundColor: '#1A1A2E',
+    width: (width - 32 - 16) / 2,
+    backgroundColor: Colors.surface,
     borderRadius: 16,
     padding: 12,
     borderWidth: 2,
@@ -168,14 +209,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   selectedCard: {
-    borderColor: '#00E676',
+    borderColor: Colors.accent,
   },
   correctCard: {
-    shadowColor: '#00E676',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 10,
-    elevation: 5,
+    borderColor: Colors.accent,
+    backgroundColor: 'rgba(0, 230, 118, 0.15)',
+  },
+  wrongCard: {
+    borderColor: Colors.danger,
+    backgroundColor: 'rgba(255, 82, 82, 0.15)',
   },
   choiceImage: {
     width: '100%',
@@ -188,7 +230,7 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: '#A0A0A0',
+    borderColor: Colors.textSecondary,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 8,
@@ -200,18 +242,18 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   radioSelected: {
-    backgroundColor: '#00E676',
+    backgroundColor: Colors.accent,
   },
   choiceTitle: {
-    color: '#FFFFFF',
+    color: Colors.textPrimary,
     fontWeight: 'bold',
-    fontSize: 14,
+    fontSize: 13,
     textAlign: 'center',
     marginBottom: 4,
   },
   choiceDesc: {
-    color: '#A0A0A0',
-    fontSize: 12,
+    color: Colors.textSecondary,
+    fontSize: 11,
     textAlign: 'center',
   },
   focusContainer: {
@@ -219,42 +261,42 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   focusLabel: {
-    color: '#FFFFFF',
-    fontSize: 16,
+    color: Colors.textPrimary,
+    fontSize: 15,
     fontWeight: 'bold',
     marginBottom: 12,
   },
   focusBar: {
     width: '100%',
-    height: 20,
-    backgroundColor: '#2D2D3F',
-    borderRadius: 10,
-    overflow: 'hidden',
+    height: 18,
+    backgroundColor: Colors.surfaceLight,
+    borderRadius: 9,
     position: 'relative',
+    overflow: 'hidden',
   },
   focusGradient: {
-    width: '100%',
     height: '100%',
-    backgroundColor: '#00E676',
+    backgroundColor: Colors.accent,
+    borderRadius: 9,
   },
   focusSlider: {
     position: 'absolute',
-    left: '50%',
-    top: -5,
-    width: 30,
-    height: 30,
+    top: -4,
+    marginLeft: -12,
+    width: 26,
+    height: 26,
     backgroundColor: '#FFFFFF',
-    borderRadius: 15,
+    borderRadius: 13,
     justifyContent: 'center',
     alignItems: 'center',
+    elevation: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.5,
-    shadowRadius: 2,
-    elevation: 5,
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
   },
   checkButton: {
-    backgroundColor: '#00E676',
+    backgroundColor: Colors.accent,
     paddingVertical: 16,
     borderRadius: 30,
     alignItems: 'center',
@@ -264,14 +306,14 @@ const styles = StyleSheet.create({
     right: 16,
   },
   checkButtonDisabled: {
-    backgroundColor: '#2D2D3F',
+    backgroundColor: Colors.surfaceLight,
   },
   checkButtonText: {
     color: '#0D0D0D',
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: 'bold',
   },
   checkButtonTextDisabled: {
-    color: '#A0A0A0',
-  }
+    color: Colors.textSecondary,
+  },
 });

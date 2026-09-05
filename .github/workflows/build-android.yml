@@ -9,7 +9,7 @@ on:
 
 jobs:
   build:
-    name: Build Android APK
+    name: Build Standalone Android APK
     runs-on: ubuntu-latest
 
     steps:
@@ -41,17 +41,17 @@ jobs:
       - name: 🔨 Expo Prebuild (generate native Android project)
         run: npx expo prebuild --platform android --clean
 
-      - name: 🏗 Build Debug APK with Gradle
+      - name: 🏗 Build Standalone Release APK with Gradle
         working-directory: android
         env:
           NODE_PATH: ${{ github.workspace }}/node_modules
           EXPO_PUBLIC_REVENUECAT_API_KEY: ${{ secrets.REVENUECAT_API_KEY }}
           GRADLE_OPTS: "-Xmx4096m -XX:MaxMetaspaceSize=1024m -Dorg.gradle.jvmargs='-Xmx4096m -XX:MaxMetaspaceSize=1024m'"
-        run: ./gradlew assembleDebug --no-daemon --stacktrace -Pandroid.lint.abortOnError=false -Pandroid.lint.checkReleaseBuilds=false -x lint -x lintDebug
+        run: ./gradlew assembleRelease --no-daemon --stacktrace -Pandroid.lint.abortOnError=false -Pandroid.lint.checkReleaseBuilds=false -x lint -x lintVitalRelease -x lintVitalAnalyzeRelease -x lintVitalReportRelease
 
-      - name: 📱 Upload APK artifact
+      - name: 📱 Upload Standalone Release APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: brilliant-wellbeing-apk
-          path: android/app/build/outputs/apk/debug/*.apk
+          name: brilliant-wellbeing-release-apk
+          path: android/app/build/outputs/apk/release/*.apk
           retention-days: 30

@@ -1,17 +1,27 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from 'react';
 import { Colors } from '@/src/theme/colors';
 import { AppProvider } from '@/src/context/AppContext';
 import { SubscriptionProvider } from '@/src/context/SubscriptionContext';
 
-SplashScreen.preventAutoHideAsync();
+SplashScreen.preventAutoHideAsync().catch(() => {
+  /* ignore error if already prevented or not available */
+});
 
 export default function RootLayout() {
   useEffect(() => {
-    SplashScreen.hideAsync();
+    // Hide splash screen safely with a guaranteed fallback timeout
+    const timer = setTimeout(async () => {
+      try {
+        await SplashScreen.hideAsync();
+      } catch (e) {
+        // ignore
+      }
+    }, 400);
+
+    return () => clearTimeout(timer);
   }, []);
 
   return (
